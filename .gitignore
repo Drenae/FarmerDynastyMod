@@ -1,0 +1,14 @@
+# Archives originales du jeu
+*.dat
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE / éditeurs
+.idea/
+.vscode/
+
+# Windows
+Thumbs.db
+Desktop.ini
