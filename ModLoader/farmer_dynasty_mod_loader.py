@@ -11,6 +11,9 @@ CREATE_SUSPENDED = 0x00000004
 PAGE_EXECUTE_READWRITE = 0x40
 
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+ntdll = ctypes.WinDLL("ntdll")
+
+PROCESS_WOW64_INFORMATION = 26
 
 
 class STARTUPINFO(ctypes.Structure):
@@ -150,6 +153,25 @@ def create_suspended(exe: Path) -> PROCESS_INFORMATION:
     return pi
 
 
+def get_image_base(process) -> int:
+    # Farmer's Dynasty est un processus PE32. Depuis un Python 64 bits sous
+    # Windows, ProcessWow64Information fournit l'adresse de son PEB 32 bits.
+    peb32 = ctypes.c_void_p()
+    status = ntdll.NtQueryInformationProcess(
+        process,
+        PROCESS_WOW64_INFORMATION,
+        ctypes.byref(peb32),
+        ctypes.sizeof(peb32),
+        None,
+    )
+    if status != 0 or not peb32.value:
+        fail("Impossible de récupérer le PEB 32 bits du jeu.")
+
+    # Dans le PEB32, ImageBaseAddress est à l'offset +0x08.
+    raw = read_memory(process, peb32.value + 0x08, 4)
+    return int.from_bytes(raw, "little")
+
+
 def read_memory(process, address: int, size: int) -> bytes:
     buf = (ctypes.c_ubyte * size)()
     read = ctypes.c_size_t()
@@ -187,10 +209,7 @@ def write_memory(process, address: int, payload: bytes) -> None:
         )
 
 
-def apply_mod(process, mod: dict) -> None:
-    game = mod.get("game", {})
-    image_base = int(game.get("image_base", "0x00400000"), 0)
-
+def apply_mod(process, mod: dict, image_base: int) -> None:
     for patch in mod.get("patches", []):
         rva = int(patch["rva"], 0)
         address = image_base + rva
@@ -233,8 +252,10 @@ def main() -> int:
     patched = False
 
     try:
+        image_base = get_image_base(pi.hProcess)
+        print(f"Base mémoire du jeu : 0x{image_base:08X}")
         for _, mod in mods:
-            apply_mod(pi.hProcess, mod)
+            apply_mod(pi.hProcess, mod, image_base)
         patched = True
     finally:
         if patched:
