@@ -1,0 +1,22 @@
+{
+  "id": "free_workers",
+  "name": "Free Workers",
+  "version": "1.0.0",
+  "author": "Drenae",
+  "description": "Rend tous les travaux des ouvriers gratuits.",
+  "enabled": true,
+  "game": {
+    "exe_sha256": [
+      "286ad3079f7100b84b36ba270fa52883f626b208a43aa929ec829739749828a5"
+    ],
+    "image_base": "0x00400000"
+  },
+  "patches": [
+    {
+      "name": "Worker price to zero",
+      "rva": "0x0008D985",
+      "original": "0F 5B C0",
+      "replace": "0F 57 C0"
+    }
+  ]
+}
